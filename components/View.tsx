@@ -1,24 +1,75 @@
+'use client';
+
+import { useEffect, useState } from "react";
 import Ping from "@/components/Ping";
-import { client } from "@/sanity/lib/client";
-import { STARTUP_VIEWS_QUERY } from "@/sanity/lib/queries";
+import { getViewCount, incrementViewCount } from "@/app/actions/viewCount";
 
-const View = async ({ id }: { id: string }) => {
-  const { views: totalviews } = await client
-    .withConfig({ useCdn: false })
-    .fetch(STARTUP_VIEWS_QUERY, { id });
+// Client component to display and update view count
+function View({ id }: { id: string }) {
+  const [views, setViews] = useState<number | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // TODO: Update the number of views
+  useEffect(() => {
+    // Initial fetch of view count
+    const fetchInitialCount = async () => {
+      try {
+        const count = await getViewCount(id);
+        setViews(count);
+      } catch (error) {
+        console.error("Error fetching view count:", error);
+        setViews(0);
+      }
+    };
 
+    // Function to update view count
+    const updateViewCount = async () => {
+      if (isUpdating) return;
+
+      try {
+        setIsUpdating(true);
+        const newCount = await incrementViewCount(id);
+        setViews(newCount);
+      } catch (error) {
+        console.error("Error updating view count:", error);
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
+    // Initial fetch
+    fetchInitialCount();
+
+    // Update view count if in production
+    if (process.env.NODE_ENV === "production") {
+      updateViewCount();
+    }
+  }, [id, isUpdating]);
+
+  // Show loading state
+  if (views === null) {
+    return (
+      <div className="view-container">
+        <div className="absolute -right-1 -top-1">
+          <Ping />
+        </div>
+        <p className="view-text">
+          <span>Loading views...</span>
+        </p>
+      </div>
+    );
+  }
+
+  // Show view count
   return (
     <div className="view-container">
       <div className="absolute -right-1 -top-1">
         <Ping />
       </div>
       <p className="view-text">
-        <span>Views: {totalviews}</span>
+        <span>Views: {views}</span>
       </p>
     </div>
   );
-};
+}
 
 export default View;
